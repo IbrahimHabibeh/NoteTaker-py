@@ -11,7 +11,18 @@ To Run the project do the following:
 1. install requirements.txt
 pip install -r requirements.txt
 
-2. Run the project
+2. Install extra packages
+
+pip install bert-extractive-summarizer
+pip install -U openai-whisper
+
+3. Install nltk packages. Run: 
+
+python
+import nltk
+nltk.download('punkt')
+
+4. Run the project
 python transcribe.py
 
 Make sure to input a proper YouTube URL. Make sure the link doesn't include the timestamp. The best way to retrieve the link is to navigate to the YouTube video, right click on it, and press "Copy Video URL."
