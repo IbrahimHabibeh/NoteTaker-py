@@ -100,6 +100,7 @@ The legacy `python transcribe.py ...` entry point still works.
 | `--compute-type`     | `auto`               | faster-whisper compute precision          |
 | `--summarizer-model` | `sshleifer/distilbart-cnn-12-6` | HF model for rewrites + titles |
 | `--no-abstractive`   | off                  | Skip the transformer; pure extractive output |
+| `--prefer-youtube-transcript/--no-prefer-youtube-transcript` | on | Use YouTube captions/subtitles |
 
 ## Output
 

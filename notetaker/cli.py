@@ -12,7 +12,7 @@ from rich.panel import Panel
 from . import chunk as chunk_mod
 from . import download, export, hierarchy, nlp, summarize
 from . import transcribe as transcribe_mod
-from .models import Notes
+from .models import Notes, TranscriptChunk
 
 app = typer.Typer(add_completion=False, help="Generate hierarchical notes from audio or YouTube.")
 console = Console()
@@ -37,6 +37,11 @@ def run(
     abstractive: bool = typer.Option(
         True, "--abstractive/--no-abstractive", help="Rewrite summaries with a transformer."
     ),
+    prefer_youtube_transcript: bool = typer.Option(
+        True,
+        "--prefer-youtube-transcript/--no-prefer-youtube-transcript",
+        help="Try yt-dlp captions first for YouTube sources and skip Whisper when available.",
+    ),
 ) -> None:
     """Run the full notetaker pipeline end-to-end."""
     output.mkdir(parents=True, exist_ok=True)
@@ -44,15 +49,32 @@ def run(
 
     console.print(Panel.fit(f"[bold]NoteTaker[/bold]\n[dim]{source}[/dim]"))
 
-    with console.status("[bold cyan]Fetching audio..."):
-        audio_path, title = download.download_audio(source, audio_dir)
-    console.print(f"[green]✓[/green] Audio ready: [dim]{audio_path.name}[/dim]")
+    segments: list[TranscriptChunk] = []
+    title = "audio"
 
-    with console.status(f"[bold cyan]Transcribing with faster-whisper ({model})..."):
-        segments = transcribe_mod.transcribe(
-            audio_path, model_size=model, device=device, compute_type=compute_type, language=language
-        )
-    console.print(f"[green]✓[/green] Transcribed {len(segments)} segments")
+    if prefer_youtube_transcript and download.is_url(source):
+        with console.status("[bold cyan]Trying YouTube transcript via yt-dlp..."):
+            transcript_result = download.try_fetch_youtube_transcript(source, language=language)
+        if transcript_result is not None:
+            title = transcript_result.title
+            segments = transcript_result.segments
+            console.print(
+                f"[green]✓[/green] Using yt-dlp {transcript_result.source_kind} "
+                f"({len(segments)} segments)"
+            )
+        else:
+            console.print("[yellow]•[/yellow] No YouTube transcript found, falling back to Whisper")
+
+    if not segments:
+        with console.status("[bold cyan]Fetching audio..."):
+            audio_path, title = download.download_audio(source, audio_dir)
+        console.print(f"[green]✓[/green] Audio ready: [dim]{audio_path.name}[/dim]")
+
+        with console.status(f"[bold cyan]Transcribing with faster-whisper ({model})..."):
+            segments = transcribe_mod.transcribe(
+                audio_path, model_size=model, device=device, compute_type=compute_type, language=language
+            )
+        console.print(f"[green]✓[/green] Transcribed {len(segments)} segments")
 
     chunks = chunk_mod.merge_segments(segments, target_seconds=chunk_seconds)
     console.print(f"[green]✓[/green] Merged into {len(chunks)} timestamped chunks")
